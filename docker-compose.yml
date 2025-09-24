@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  spark:
+    image: bitnami/spark:3.5.0
+    container_name: spark
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "7077:7077"   # Spark Master
+      - "8080:8080"   # Spark Web UI
+      - "4040:4040"   # Spark Job UI
+      - "10000:10000" # Spark Thrift Server (SQL/JDBC)
+    volumes:
+      - ./data:/opt/bitnami/spark/data
+      - ./init:/docker-entrypoint-initdb.d
+
+  spark-worker:
+    image: bitnami/spark:3.5.0
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+    depends_on:
+      - spark
+    volumes:
+      - ./data:/opt/bitnami/spark/data

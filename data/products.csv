@@ -1,0 +1,16 @@
+product_id,product_name,category,price,stock_quantity,description
+1,Laptop Dell XPS 13,Electronics,1299.99,45,High-performance laptop with 16GB RAM and 512GB SSD
+2,Wireless Mouse,Electronics,24.99,120,Ergonomic wireless mouse with long battery life
+3,Coffee Maker,Home Appliances,89.95,62,Programmable coffee maker with 12-cup capacity
+4,Running Shoes,Sportswear,79.50,85,Lightweight running shoes with cushioned soles
+5,Protein Powder,Nutrition,29.99,100,Whey protein powder with 25g protein per serving
+6,Yoga Mat,Fitness,19.95,75,Non-slip exercise yoga mat
+7,Smart Watch,Electronics,199.99,30,Fitness tracker with heart rate monitoring
+8,Blender,Home Appliances,59.99,40,High-speed blender for smoothies and soups
+9,Backpack,Accessories,45.00,55,Water-resistant backpack with laptop compartment
+10,Office Chair,Furniture,149.95,25,Ergonomic office chair with lumbar support
+11,External Hard Drive,Electronics,89.99,60,1TB portable external hard drive
+12,Wireless Earbuds,Electronics,129.99,90,Noise-cancelling wireless earbuds
+13,Kitchen Knife Set,Kitchenware,79.95,35,5-piece stainless steel kitchen knife set
+14,Skillet Pan,Kitchenware,34.50,48,Non-stick cooking pan with heat-resistant handle
+15,LED Desk Lamp,Home Decor,27.99,70,Adjustable LED desk lamp with multiple brightness levels
