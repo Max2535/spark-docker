@@ -1,3 +1,8 @@
+docker compose build
+docker compose up -d
 powershell -ExecutionPolicy Bypass -File .\run-init.ps1
-docker-compose up -d
-docker-compose logs -f spark
+
+docker compose logs -f backend
+# docker compose down -v
+
+# TODO: integrate Postgres/MinIO as external storage for Spark

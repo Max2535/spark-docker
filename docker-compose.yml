@@ -1,30 +1,86 @@
 version: "3.9"
+
 services:
-  spark:
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    environment:
+      - CLUSTER_NAME=test
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    ports:
+      - "9870:9870"   # HDFS web UI
+      - "9000:9000"   # HDFS RPC
+    volumes:
+      - ./hdfs/namenode:/hadoop/dfs/name
+    networks:
+      - spark-net
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+    volumes:
+      - ./hdfs/datanode:/hadoop/dfs/data
+    depends_on:
+      - namenode
+    networks:
+      - spark-net
+
+  spark-master:
     image: bitnami/spark:3.5.0
-    container_name: spark
+    container_name: spark-master
     environment:
       - SPARK_MODE=master
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
-    ports:
-      - "7077:7077"   # Spark Master
-      - "8080:8080"   # Spark Web UI
-      - "4040:4040"   # Spark Job UI
-      - "10000:10000" # Spark Thrift Server (SQL/JDBC)
     volumes:
-      - ./data:/opt/bitnami/spark/data
-      - ./init:/docker-entrypoint-initdb.d
+      - ./data:/data
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    networks:
+      - spark-net
 
   spark-worker:
     image: bitnami/spark:3.5.0
     container_name: spark-worker
     environment:
       - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark:7077
-    depends_on:
-      - spark
+      - SPARK_MASTER_URL=spark://spark-master:7077
     volumes:
-      - ./data:/opt/bitnami/spark/data
+      - ./data:/data
+    depends_on:
+      - spark-master
+    networks:
+      - spark-net
+
+  backend:
+    build: ./backend
+    container_name: backend
+    environment:
+      - HDFS_URL=hdfs://namenode:9000
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - RESULT_ROW_LIMIT=100
+    volumes:
+      - ./uploads:/uploads
+      - ./data:/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      - namenode
+      - spark-master
+    networks:
+      - spark-net
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - spark-net
+
+networks:
+  spark-net:
+    driver: bridge

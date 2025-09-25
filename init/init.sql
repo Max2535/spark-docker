@@ -10,7 +10,7 @@ CREATE TABLE sales (
 )
 USING csv
 OPTIONS (
-    path '/opt/bitnami/spark/data/sales.csv',
+    path 'file:///data/sales.csv',
     header 'true',
     inferSchema 'true'
 );
@@ -28,7 +28,7 @@ CREATE TABLE products (
 )
 USING csv
 OPTIONS (
-    path '/opt/bitnami/spark/data/products.csv',
+    path 'file:///data/products.csv',
     header 'true',
     inferSchema 'true'
 );
