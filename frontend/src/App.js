@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
@@ -190,6 +190,44 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [isQuerying, setIsQuerying] = useState(false);
 
+  // Autocomplete: catalog, suggestions, and editor refs
+  const [tables, setTables] = useState([]);
+  const [columnsByTable, setColumnsByTable] = useState({});
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] = useState(0);
+  const textareaRef = useRef(null);
+
+  const KEYWORDS = [
+    'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'FULL JOIN',
+    'ON', 'AS', 'LIMIT', 'OFFSET', 'AND', 'OR', 'NOT', 'BETWEEN', 'LIKE', 'IN', 'IS NULL', 'IS NOT NULL',
+    'HAVING', 'DISTINCT', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'CAST', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+    'UNION', 'UNION ALL', 'DESC', 'ASC'
+  ];
+
+  // Load tables/columns from backend once
+  useEffect(() => {
+    const loadCatalog = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/tables`);
+        const data = await res.json();
+        if (res.ok && data.tables) {
+          setTables(data.tables);
+          data.tables.forEach(async (t) => {
+            try {
+              const cr = await fetch(`${API_BASE_URL}/columns?table=${encodeURIComponent(t.name)}`);
+              const cd = await cr.json();
+              if (cr.ok && cd.columns) {
+                setColumnsByTable(prev => ({ ...prev, [t.name]: cd.columns.map(c => c.name) }));
+              }
+            } catch {}
+          });
+        }
+      } catch {}
+    };
+    loadCatalog();
+  }, []);
+
   const uploadFile = async () => {
     if (!file) {
       setError("Please choose a CSV file first");
@@ -214,6 +252,14 @@ function App() {
       setLastUpload(data);
       setStatusMessage(data.message);
       setQueryResult(null);
+      // Update catalog with the newly registered temp view
+      if (data?.tableName && Array.isArray(data?.columns)) {
+        setTables((prev) => {
+          const exists = prev.some((t) => t.name === data.tableName);
+          return exists ? prev : [...prev, { name: data.tableName, isTemporary: true }];
+        });
+        setColumnsByTable((prev) => ({ ...prev, [data.tableName]: data.columns }));
+      }
     } catch (err) {
       console.error("Upload failed", err);
       setError(err.message || "An unexpected error occurred while uploading");
@@ -253,6 +299,116 @@ function App() {
       setQueryResult(null);
     } finally {
       setIsQuerying(false);
+    }
+  };
+
+  // ===== Autocomplete helpers =====
+  const getTokenBounds = (text, cursor) => {
+    const isToken = (ch) => /[A-Za-z0-9_\.]/.test(ch);
+    let start = cursor;
+    let end = cursor;
+    while (start > 0 && isToken(text[start - 1])) start--;
+    while (end < text.length && isToken(text[end])) end++;
+    return { start, end, token: text.slice(start, end) };
+  };
+
+  const buildSuggestions = (text, cursor) => {
+    const { start, end, token } = getTokenBounds(text, cursor);
+    const before = text.slice(0, start);
+    const prevWordMatch = before.match(/([A-Za-z_]+)\s*$/i);
+    const prevWord = prevWordMatch ? prevWordMatch[1].toUpperCase() : "";
+
+    const items = [];
+    const add = (type, value, detail) => items.push({ type, value, detail });
+    const tableNames = tables.map(t => t.name);
+    const allColumns = Object.values(columnsByTable).flat();
+
+    if (token.includes('.')) {
+      const [tbl, prefix = ""] = token.split('.', 2);
+      const cols = columnsByTable[tbl] || [];
+      cols.filter(c => c.toLowerCase().startsWith(prefix.toLowerCase()))
+          .slice(0, 50)
+          .forEach(c => add('column', `${tbl}.${c}`, tbl));
+    } else {
+      if (["FROM", "JOIN", "UPDATE", "INTO"].includes(prevWord)) {
+        tableNames.filter(n => n.toLowerCase().startsWith(token.toLowerCase()))
+                  .slice(0, 50)
+                  .forEach(n => add('table', n));
+      } else {
+        KEYWORDS.filter(k => k.toLowerCase().startsWith(token.toLowerCase()))
+                .slice(0, 50)
+                .forEach(k => add('keyword', k));
+        tableNames.filter(n => n.toLowerCase().startsWith(token.toLowerCase()))
+                  .slice(0, 50)
+                  .forEach(n => add('table', n));
+        allColumns.filter(c => c.toLowerCase().startsWith(token.toLowerCase()))
+                  .slice(0, 50)
+                  .forEach(c => add('column', c));
+      }
+    }
+    return { list: items, range: { start, end } };
+  };
+
+  const openSuggestions = () => {
+    if (!textareaRef.current) return;
+    const cursor = textareaRef.current.selectionStart;
+    const { list } = buildSuggestions(query, cursor);
+    setSuggestions(list);
+    setSelectedSuggestion(0);
+    setShowSuggestions(list.length > 0);
+  };
+
+  const applySuggestion = (sugg, range) => {
+    const before = query.slice(0, range.start);
+    const after = query.slice(range.end);
+    const insert = sugg.value;
+    const next = before + insert + after;
+    setQuery(next);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    // restore caret
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        const pos = before.length + insert.length;
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(pos, pos);
+      }
+    });
+  };
+
+  const onTextareaKeyDown = (e) => {
+    if (e.ctrlKey && e.code === 'Space') {
+      e.preventDefault();
+      openSuggestions();
+      return;
+    }
+    if (showSuggestions && suggestions.length) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedSuggestion((p) => (p + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedSuggestion((p) => (p - 1 + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const cursor = textareaRef.current ? textareaRef.current.selectionStart : query.length;
+        const { range } = buildSuggestions(query, cursor);
+        applySuggestion(suggestions[selectedSuggestion], range);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowSuggestions(false);
+        return;
+      }
+    }
+    const isChar = e.key.length === 1 && /[A-Za-z0-9_.]/.test(e.key);
+    if (isChar || e.key === 'Backspace' || e.key === 'Delete') {
+      setTimeout(() => openSuggestions(), 0);
     }
   };
 
@@ -404,6 +560,9 @@ function App() {
           <p style={{ color: '#6b7280', marginBottom: '20px', fontSize: '14px' }}>
             Write your SQL query to analyze the uploaded data
           </p>
+          <p style={{ color: '#9ca3af', marginTop: '-12px', marginBottom: '16px', fontSize: '12px', fontStyle: 'italic' }}>
+            Tip: Press Ctrl+Space for autocomplete (keywords, tables, columns)
+          </p>
 
           <textarea
             className="textarea"
@@ -411,7 +570,50 @@ function App() {
             placeholder="SELECT * FROM your_table LIMIT 10;"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onTextareaKeyDown}
+            ref={textareaRef}
           />
+
+          {showSuggestions && suggestions.length ? (
+            <div style={{
+              marginTop: '8px',
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+              maxHeight: '220px',
+              overflowY: 'auto'
+            }}>
+              {suggestions.map((s, idx) => (
+                <div
+                  key={idx}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    const cursor = textareaRef.current ? textareaRef.current.selectionStart : query.length;
+                    const { range } = buildSuggestions(query, cursor);
+                    applySuggestion(s, range);
+                  }}
+                  onMouseEnter={() => setSelectedSuggestion(idx)}
+                  style={{
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    background: idx === selectedSuggestion ? '#eef2ff' : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontFamily: "'Monaco', 'Menlo', 'Ubuntu Mono', monospace",
+                    fontSize: '13px'
+                  }}
+                >
+                  <span style={{ display: 'inline-block', minWidth: '56px', color: '#6b7280' }}>{s.type}</span>
+                  <span style={{ color: '#111827' }}>{s.value}</span>
+                  {s.detail ? (
+                    <span style={{ color: '#9ca3af', marginLeft: 'auto' }}>{s.detail}</span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <button
             className="button"

@@ -34,6 +34,8 @@ Open the following URLs after the containers are running:
 - Backend OpenAPI docs: <http://localhost:8000/docs>
 - Spark master web UI: <http://localhost:8080>
 
+Tip: In the frontend SQL editor, press Ctrl+Space for autocomplete (SQL keywords, tables, and columns). The table/column list is populated from uploads and the Spark catalog.
+
 To watch logs:
 
 ```powershell

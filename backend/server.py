@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pyspark.sql import SparkSession
 import pandas as pd
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -78,3 +79,34 @@ async def run_query(query: str = Form(...)):
         }
     except Exception as e:
         return JSONResponse(status_code=400, content={"detail": f"Query error: {e}"})
+
+
+@app.get("/tables")
+async def list_tables():
+    try:
+        tables = spark.catalog.listTables()
+        results = []
+        for t in tables:
+            results.append(
+                {
+                    "name": t.name,
+                    "database": t.database,
+                    "tableType": t.tableType,
+                    "isTemporary": t.isTemporary,
+                }
+            )
+        return {"tables": results}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": f"List tables failed: {e}"})
+
+
+@app.get("/columns")
+async def list_columns(table: str):
+    try:
+        if not table:
+            return JSONResponse(status_code=400, content={"detail": "Missing 'table' parameter"})
+        df = spark.table(table)
+        cols = [{"name": name, "type": dtype} for name, dtype in df.dtypes]
+        return {"table": table, "columns": cols}
+    except Exception as e:
+        return JSONResponse(status_code=404, content={"detail": f"Describe table failed: {e}"})

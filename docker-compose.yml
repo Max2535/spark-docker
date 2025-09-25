@@ -12,6 +12,18 @@ services:
       - "9000:9000"   # HDFS RPC
     volumes:
       - ./hdfs/namenode:/hadoop/dfs/name
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9870/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - spark-net
 
@@ -24,6 +36,18 @@ services:
       - ./hdfs/datanode:/hadoop/dfs/data
     depends_on:
       - namenode
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9864/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - spark-net
 
@@ -37,6 +61,18 @@ services:
     ports:
       - "7077:7077"
       - "8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - spark-net
 
@@ -50,6 +86,18 @@ services:
       - ./data:/data
     depends_on:
       - spark-master
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/ || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - spark-net
 
@@ -68,6 +116,19 @@ services:
     depends_on:
       - namenode
       - spark-master
+    restart: unless-stopped
+    # simple TCP port healthcheck using Python (python is present in backend image)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket,sys; s=__import__('socket').socket(); s.settimeout(2); s.connect(('127.0.0.1',8000)); s.close()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - spark-net
 
@@ -78,6 +139,19 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    restart: unless-stopped
+    # Node-based healthcheck (uses node present in the image)
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', res => process.exit(0)).on('error', () => process.exit(1))"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - spark-net
 

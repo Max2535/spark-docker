@@ -1,0 +1,35 @@
+{
+  "name": "web-scraping-suite",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Complete web scraping suite with Cypress, Playwright, Selenium, and Requests",
+  "license": "MIT",
+  "main": "scraper.py",
+  "scripts": {
+    "scrape": "echo 'Use: python3 scraper.py --help'",
+    "scrape:cypress": "cypress run --project . --browser chrome",
+    "scrape:shopee": "cypress run --project . --browser chrome",
+    "cypress:open": "cypress open --project .",
+    "cypress:run": "cypress run --project . --browser chrome",
+    "cypress:run:headed": "cypress run --project . --browser chrome --headed",
+    "install:browsers": "npx playwright install",
+    "test": "cypress run"
+  },
+  "keywords": [
+    "web-scraping",
+    "cypress",
+    "playwright", 
+    "selenium",
+    "automation",
+    "shopee",
+    "ecommerce"
+  ],
+  "author": "Web Scraping Suite",
+  "devDependencies": {
+    "cypress": "^15.3.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
+
